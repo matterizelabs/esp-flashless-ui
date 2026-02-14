@@ -5,10 +5,11 @@
 If your firmware serves a web UI, the usual loop is slow:
 
 1. Build and flash.
-2. Open the device UI.
-3. Click around.
-4. Change frontend code.
-5. Repeat.
+2. Establish network connection.
+3. Open the device UI.
+4. Click around.
+5. Change frontend code.
+6. Repeat.
 
 Most time is spent waiting for flash + reboot instead of validating UI behavior.
 

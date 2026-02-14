@@ -6,7 +6,7 @@ repository: "https://github.com/matterizelabs/esp-flashless-ui.git"
 issues: "https://github.com/matterizelabs/esp-flashless-ui/issues"
 license: "MIT"
 maintainers:
-  - "Matterize Labs"
+  - "Matterize Labs (https://github.com/matterizelabs)"
 dependencies:
   idf: ">=5.2.0"
 files:
