@@ -10,10 +10,17 @@
 
 ## Install
 
-Add as a managed component from GitHub:
+Add from the ESP Component Registry:
 
 ```bash
-idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.1 flashless
+idf.py add-dependency "matterizelabs/flashless^1.0.2"
+idf.py reconfigure
+```
+
+Git source install (if needed):
+
+```bash
+idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.2 flashless
 idf.py reconfigure
 ```
 

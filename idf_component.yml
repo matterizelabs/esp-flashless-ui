@@ -1,12 +1,12 @@
-version: "1.0.1"
+version: "1.0.2"
 description: "ESP-IDF flashless: no-flash browser preview for frontend routes and assets"
-url: "https://components.espressif.com/components/matterizelabs/flashless"
+url: "https://github.com/matterizelabs/esp-flashless-ui"
 documentation: "https://github.com/matterizelabs/esp-flashless-ui#readme"
 repository: "https://github.com/matterizelabs/esp-flashless-ui.git"
 issues: "https://github.com/matterizelabs/esp-flashless-ui/issues"
 license: "MIT"
 maintainers:
-  - "flashless-maintainers <flashless-maintainers@example.com>"
+  - "Matterize Labs"
 dependencies:
   idf: ">=5.2.0"
 files:
