@@ -10,16 +10,15 @@
 
 ## Install
 
-Add as a managed component:
+Add as a managed component from GitHub:
 
 ```bash
-idf.py add-dependency "matterizelabs/flashless^1.0.0"
+idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.0 flashless
 idf.py reconfigure
 ```
 
-Component Registry page:
+Component Registry page (published versions):
 `https://components.espressif.com/components/matterizelabs/flashless`
-
 ## Run
 
 ```bash
