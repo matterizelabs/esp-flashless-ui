@@ -60,10 +60,11 @@ def validate_parity(manifest: Manifest) -> ValidationResult:
 
 
 class PreviewServer:
-    def __init__(self, manifest: Manifest, host: str, port: int):
+    def __init__(self, manifest: Manifest, host: str, port: int, request_log_level: str = "errors"):
         self._manifest = manifest
         self._host = host
         self._port = port
+        self._request_log_level = request_log_level
         self._httpd = ThreadingHTTPServer((host, port), self._build_handler())
         self._thread: threading.Thread | None = None
 
@@ -94,6 +95,7 @@ class PreviewServer:
 
     def _build_handler(self):
         manifest = self._manifest
+        request_log_level = self._request_log_level
         api_map = {(m.method.upper(), m.path): m for m in manifest.api.mappings}
         base_path = manifest.ui.base_path
 
@@ -116,6 +118,15 @@ class PreviewServer:
                 self._dispatch("PATCH")
 
             def log_message(self, fmt: str, *args: Any) -> None:
+                status_code: int | None = None
+                if len(args) >= 2:
+                    try:
+                        status_code = int(args[1])
+                    except (TypeError, ValueError):
+                        status_code = None
+
+                if not _should_log_request(request_log_level, status_code):
+                    return
                 print(f"[flashless] {self.address_string()} - {fmt % args}")
 
             def _dispatch(self, method: str) -> None:
@@ -240,3 +251,13 @@ def _route_to_asset_candidate(route: str) -> str | None:
 def _guess_content_type(path: Path) -> str:
     guessed, _ = mimetypes.guess_type(path.name)
     return guessed or "application/octet-stream"
+
+
+def _should_log_request(level: str, status_code: int | None) -> bool:
+    if level == "none":
+        return False
+    if level == "errors":
+        if status_code is None:
+            return True
+        return status_code >= 400
+    return True

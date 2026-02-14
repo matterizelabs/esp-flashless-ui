@@ -56,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--manifest")
     run_parser.add_argument("--bind-port", type=int, default=8787)
     run_parser.add_argument("--host", default="127.0.0.1")
+    run_parser.add_argument("--request-log", default="errors", choices=["all", "errors", "none"])
     run_parser.add_argument("--no-open", action="store_true")
     run_parser.add_argument("--mode", default="mock", choices=["mock", "proxy"])
     run_parser.add_argument("--fixtures")
@@ -80,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
                 manifest=args.manifest,
                 port=args.bind_port,
                 host=args.host,
+                request_log=args.request_log,
                 open_browser=not args.no_open,
                 mode=args.mode,
                 fixtures=args.fixtures,

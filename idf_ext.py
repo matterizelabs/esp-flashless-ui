@@ -53,6 +53,7 @@ def action_extensions(base_actions, project_path):
             manifest=kwargs.get("manifest"),
             port=_resolve_bind_port(kwargs),
             host=kwargs.get("host", "127.0.0.1"),
+            request_log=kwargs.get("request_log", "errors"),
             open_browser=not kwargs.get("no_open", False),
             mode=kwargs.get("mode", "mock"),
             fixtures=kwargs.get("fixtures"),
@@ -88,6 +89,12 @@ def action_extensions(base_actions, project_path):
                         "help": "Preview server host bind address.",
                         "type": str,
                         "default": "127.0.0.1",
+                    },
+                    {
+                        "names": ["--request-log"],
+                        "help": "Request logging mode.",
+                        "type": _choice(["all", "errors", "none"]),
+                        "default": "errors",
                     },
                     {
                         "names": ["--no-open"],

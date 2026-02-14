@@ -19,6 +19,7 @@ class FlashlessOptions:
     manifest: str | None = None
     port: int = 8787
     host: str = "127.0.0.1"
+    request_log: str = "errors"
     open_browser: bool = True
     mode: str = "mock"
     fixtures: str | None = None
@@ -56,7 +57,12 @@ def run_flashless(project_path: str | Path, build_dir: str | Path, options: Flas
         )
 
     try:
-        server = PreviewServer(manifest=manifest, host=options.host, port=options.port)
+        server = PreviewServer(
+            manifest=manifest,
+            host=options.host,
+            port=options.port,
+            request_log_level=options.request_log,
+        )
     except OSError as exc:
         raise FlashlessError(f"Failed to bind preview server on {options.host}:{options.port}: {exc}") from exc
 

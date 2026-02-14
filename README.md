@@ -13,7 +13,7 @@
 Add as a managed component from GitHub:
 
 ```bash
-idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.0 flashless
+idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.1 flashless
 idf.py reconfigure
 ```
 
@@ -36,12 +36,13 @@ Stop with `Ctrl+C`.
 ## Options
 
 ```bash
-idf.py flashless --manifest flashless.manifest.json --bind-port 8787 --host 127.0.0.1 --strict
+idf.py flashless --manifest flashless.manifest.json --bind-port 8787 --host 127.0.0.1 --request-log errors --strict
 ```
 
 Flags:
 
 - `--bind-port <port>`
+- `--request-log <all|errors|none>`
 - `--no-open`
 - `--mode mock`
 - `--fixtures <path>`

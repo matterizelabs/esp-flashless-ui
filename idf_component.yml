@@ -1,4 +1,4 @@
-version: "1.0.0"
+version: "1.0.1"
 description: "ESP-IDF flashless: no-flash browser preview for frontend routes and assets"
 url: "https://components.espressif.com/components/matterizelabs/flashless"
 documentation: "https://github.com/matterizelabs/esp-flashless-ui#readme"
