@@ -4,7 +4,7 @@ url: "https://components.espressif.com/components/matterizelabs/flashless"
 documentation: "https://github.com/matterizelabs/esp-flashless-ui#readme"
 repository: "https://github.com/matterizelabs/esp-flashless-ui.git"
 issues: "https://github.com/matterizelabs/esp-flashless-ui/issues"
-license: "Apache-2.0"
+license: "MIT"
 maintainers:
   - "flashless-maintainers <flashless-maintainers@example.com>"
 dependencies:
@@ -15,6 +15,8 @@ files:
     - "idf_component.yml"
     - "idf_ext.py"
     - "README.md"
+    - "CONTRIBUTING.md"
+    - "CODE_OF_CONDUCT.md"
     - "LICENSE"
     - "schema/*.json"
     - "examples/*.json"
