@@ -87,3 +87,9 @@ Schema file:
 Each run writes:
 
 - `build/flashless/report.json`
+
+## Project Policies
+
+- Contributing guide: `CONTRIBUTING.md`
+- Code of Conduct: `CODE_OF_CONDUCT.md`
+- License: `LICENSE` (MIT)
