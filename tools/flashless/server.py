@@ -1,0 +1,242 @@
+"""Preview HTTP server for flashless."""
+
+from __future__ import annotations
+
+import json
+import mimetypes
+import os
+import posixpath
+import threading
+from dataclasses import dataclass
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import unquote, urlparse
+
+from .errors import FlashlessError
+from .manifest import Manifest, route_matches
+
+
+@dataclass(frozen=True)
+class ValidationResult:
+    missing_required_files: tuple[str, ...]
+    missing_fixture_files: tuple[str, ...]
+    unresolved_routes: tuple[str, ...]
+
+    @property
+    def has_errors(self) -> bool:
+        return bool(self.missing_required_files or self.missing_fixture_files or self.unresolved_routes)
+
+
+def validate_parity(manifest: Manifest) -> ValidationResult:
+    missing_required = []
+    for rel in manifest.validation.required_files:
+        if not _safe_join(manifest.ui.asset_root, rel).exists():
+            missing_required.append(rel)
+
+    missing_fixture = []
+    for mapping in manifest.api.mappings:
+        fixture_path = _safe_join(manifest.api.fixtures_dir, mapping.fixture)
+        if not fixture_path.exists():
+            missing_fixture.append(mapping.fixture)
+
+    unresolved_routes = []
+    for route in manifest.ui.routes:
+        if route.endswith("/*"):
+            continue
+        candidate = _route_to_asset_candidate(route)
+        if candidate and _safe_join(manifest.ui.asset_root, candidate).exists():
+            continue
+        if manifest.ui.spa_fallback and _safe_join(manifest.ui.asset_root, manifest.ui.entry_file).exists():
+            continue
+        unresolved_routes.append(route)
+
+    return ValidationResult(
+        missing_required_files=tuple(sorted(set(missing_required))),
+        missing_fixture_files=tuple(sorted(set(missing_fixture))),
+        unresolved_routes=tuple(sorted(set(unresolved_routes))),
+    )
+
+
+class PreviewServer:
+    def __init__(self, manifest: Manifest, host: str, port: int):
+        self._manifest = manifest
+        self._host = host
+        self._port = port
+        self._httpd = ThreadingHTTPServer((host, port), self._build_handler())
+        self._thread: threading.Thread | None = None
+
+    @property
+    def address(self) -> tuple[str, int]:
+        return self._httpd.server_address
+
+    def serve_forever(self) -> None:
+        try:
+            self._httpd.serve_forever(poll_interval=0.2)
+        finally:
+            self._httpd.server_close()
+
+    def start(self) -> None:
+        if self._thread is not None:
+            return
+        self._thread = threading.Thread(target=self.serve_forever, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        if self._thread is None:
+            self._httpd.server_close()
+            return
+
+        self._httpd.shutdown()
+        self._thread.join(timeout=2)
+        self._thread = None
+
+    def _build_handler(self):
+        manifest = self._manifest
+        api_map = {(m.method.upper(), m.path): m for m in manifest.api.mappings}
+        base_path = manifest.ui.base_path
+
+        class Handler(BaseHTTPRequestHandler):
+            server_version = "flashless/1.0"
+
+            def do_GET(self):
+                self._dispatch("GET")
+
+            def do_POST(self):
+                self._dispatch("POST")
+
+            def do_PUT(self):
+                self._dispatch("PUT")
+
+            def do_DELETE(self):
+                self._dispatch("DELETE")
+
+            def do_PATCH(self):
+                self._dispatch("PATCH")
+
+            def log_message(self, fmt: str, *args: Any) -> None:
+                print(f"[flashless] {self.address_string()} - {fmt % args}")
+
+            def _dispatch(self, method: str) -> None:
+                parsed = urlparse(self.path)
+                request_path = _normalize_http_path(unquote(parsed.path))
+
+                mapped = api_map.get((method.upper(), request_path))
+                if mapped is not None:
+                    return self._serve_fixture(mapped.fixture, mapped.status, mapped.headers)
+
+                if base_path != "/" and not request_path.startswith(base_path + "/") and request_path != base_path:
+                    return self._respond_not_found(request_path)
+
+                rel_route = _relative_to_base(request_path, base_path)
+
+                static_candidate = self._resolve_static_candidate(rel_route)
+                if static_candidate is not None and static_candidate.exists() and static_candidate.is_file():
+                    return self._serve_file(static_candidate)
+
+                is_declared = any(route_matches(pattern, rel_route) for pattern in manifest.ui.routes)
+                if is_declared or (manifest.ui.spa_fallback and not manifest.validation.disallow_extra_routes):
+                    entry = _safe_join(manifest.ui.asset_root, manifest.ui.entry_file)
+                    if entry.exists() and entry.is_file():
+                        return self._serve_file(entry)
+
+                return self._respond_not_found(request_path)
+
+            def _resolve_static_candidate(self, rel_route: str) -> Path | None:
+                if rel_route in {"", "/"}:
+                    return _safe_join(manifest.ui.asset_root, manifest.ui.entry_file)
+
+                normalized = rel_route.lstrip("/")
+                candidate = _safe_join(manifest.ui.asset_root, normalized)
+                if candidate.exists() and candidate.is_file():
+                    return candidate
+
+                if not os.path.splitext(normalized)[1]:
+                    html_candidate = _safe_join(manifest.ui.asset_root, normalized + ".html")
+                    if html_candidate.exists() and html_candidate.is_file():
+                        return html_candidate
+                return None
+
+            def _serve_fixture(self, fixture_rel: str, status: int, headers: dict[str, str]) -> None:
+                fixture_path = _safe_join(manifest.api.fixtures_dir, fixture_rel)
+                if not fixture_path.exists() or not fixture_path.is_file():
+                    return self._respond_json({"error": f"Missing fixture: {fixture_rel}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+
+                payload = fixture_path.read_bytes()
+                self.send_response(status)
+                content_type = headers.get("Content-Type") or _guess_content_type(fixture_path)
+                self.send_header("Content-Type", content_type)
+                self.send_header("Content-Length", str(len(payload)))
+                for name, value in headers.items():
+                    if name.lower() in {"content-length", "content-type"}:
+                        continue
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def _serve_file(self, file_path: Path) -> None:
+                data = file_path.read_bytes()
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", _guess_content_type(file_path))
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", f"public, max-age={manifest.ui.cache_policy['maxAgeSeconds']}")
+                if manifest.ui.cache_policy.get("etag", True):
+                    stat = file_path.stat()
+                    self.send_header("ETag", f'W/"{stat.st_mtime_ns:x}-{stat.st_size:x}"')
+                self.end_headers()
+                self.wfile.write(data)
+
+            def _respond_not_found(self, path: str) -> None:
+                self._respond_json({"error": "Not found", "path": path}, HTTPStatus.NOT_FOUND)
+
+            def _respond_json(self, payload: dict[str, Any], status: HTTPStatus) -> None:
+                body = json.dumps(payload).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        return Handler
+
+
+def _safe_join(root: Path, relative: str) -> Path:
+    rel = relative.strip().replace("\\", "/")
+    rel = posixpath.normpath(rel).lstrip("/")
+    candidate = (root / rel).resolve()
+    root_resolved = root.resolve()
+    if root_resolved == candidate or root_resolved in candidate.parents:
+        return candidate
+    raise FlashlessError(f"Path escapes root directory: {relative}")
+
+
+def _normalize_http_path(path: str) -> str:
+    cleaned = posixpath.normpath(path)
+    if not cleaned.startswith("/"):
+        cleaned = "/" + cleaned
+    return cleaned
+
+
+def _relative_to_base(request_path: str, base_path: str) -> str:
+    if base_path == "/":
+        return request_path
+    if request_path == base_path:
+        return "/"
+    return "/" + request_path[len(base_path) + 1 :].lstrip("/")
+
+
+def _route_to_asset_candidate(route: str) -> str | None:
+    if route in {"", "/"}:
+        return None
+    value = route.lstrip("/")
+    if not value:
+        return None
+    if "." in value.rsplit("/", 1)[-1]:
+        return value
+    return None
+
+
+def _guess_content_type(path: Path) -> str:
+    guessed, _ = mimetypes.guess_type(path.name)
+    return guessed or "application/octet-stream"

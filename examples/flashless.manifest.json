@@ -1,0 +1,41 @@
+{
+  "version": "1",
+  "ui": {
+    "basePath": "/",
+    "assetRoot": "web/dist",
+    "entryFile": "index.html",
+    "routes": [
+      "/",
+      "/settings",
+      "/wifi/*"
+    ],
+    "spaFallback": true,
+    "cachePolicy": {
+      "maxAgeSeconds": 0,
+      "etag": true,
+      "gzip": false
+    }
+  },
+  "api": {
+    "mode": "mock",
+    "fixturesDir": "ui-fixtures",
+    "map": [
+      {
+        "method": "GET",
+        "path": "/api/health",
+        "fixture": "health.json",
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      }
+    ]
+  },
+  "validation": {
+    "requiredFiles": [
+      "index.html",
+      "assets/app.js"
+    ],
+    "disallowExtraRoutes": false
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/flashless.schema.json",
+  "title": "flashless manifest",
+  "type": "object",
+  "required": ["version", "ui"],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "ui": {
+      "type": "object",
+      "required": ["assetRoot"],
+      "properties": {
+        "basePath": { "type": "string" },
+        "assetRoot": { "type": "string" },
+        "entryFile": { "type": "string" },
+        "routes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "spaFallback": { "type": "boolean" },
+        "cachePolicy": {
+          "type": "object",
+          "properties": {
+            "maxAgeSeconds": { "type": "integer", "minimum": 0 },
+            "etag": { "type": "boolean" },
+            "gzip": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["mock", "proxy"]
+        },
+        "fixturesDir": { "type": "string" },
+        "map": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["method", "path", "fixture"],
+            "properties": {
+              "method": { "type": "string" },
+              "path": { "type": "string" },
+              "fixture": { "type": "string" },
+              "status": { "type": "integer", "minimum": 100 },
+              "headers": {
+                "type": "object",
+                "additionalProperties": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "requiredFiles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "disallowExtraRoutes": { "type": "boolean" }
+      }
+    }
+  }
+}
