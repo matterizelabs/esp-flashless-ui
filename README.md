@@ -13,9 +13,12 @@
 Add as a managed component:
 
 ```bash
-idf.py add-dependency "acme/flashless^1.0.0"
+idf.py add-dependency "matterizelabs/flashless^1.0.0"
 idf.py reconfigure
 ```
+
+Component Registry page:
+`https://components.espressif.com/components/matterizelabs/flashless`
 
 ## Run
 
@@ -47,6 +50,21 @@ Flags:
 - `--no-build`
 - `--strict`
 - `--no-auto`
+
+## Help
+
+Use the integrated ESP-IDF action help:
+
+```bash
+idf.py flashless --help
+```
+
+Use standalone component CLI help:
+
+```bash
+PYTHONPATH=tools python -m flashless.cli --help
+PYTHONPATH=tools python -m flashless.cli run --help
+```
 
 ## Manifest
 
