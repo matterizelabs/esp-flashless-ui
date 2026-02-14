@@ -30,12 +30,28 @@ def _choice(values: list[str]):
     return click.Choice(values, case_sensitive=False)
 
 
+def _resolve_bind_port(kwargs) -> int:
+    # `--bind-port` avoids collision with IDF global serial `--port`.
+    value = kwargs.get("bind_port")
+    if value is None:
+        # Backward-compatibility for callers that still pass `port`.
+        value = kwargs.get("port")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 8787
+    return 8787
+
+
 def action_extensions(base_actions, project_path):
     def flashless_callback(action, ctx, args, **kwargs):
         build_dir = getattr(args, "build_dir", "build")
         options = FlashlessOptions(
             manifest=kwargs.get("manifest"),
-            port=kwargs.get("port", 8787),
+            port=_resolve_bind_port(kwargs),
             host=kwargs.get("host", "127.0.0.1"),
             open_browser=not kwargs.get("no_open", False),
             mode=kwargs.get("mode", "mock"),
@@ -62,8 +78,8 @@ def action_extensions(base_actions, project_path):
                         "type": str,
                     },
                     {
-                        "names": ["--port"],
-                        "help": "Preview server port.",
+                        "names": ["--bind-port"],
+                        "help": "Preview server bind port.",
                         "type": int,
                         "default": 8787,
                     },

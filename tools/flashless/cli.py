@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--project-dir", required=True)
     run_parser.add_argument("--build-dir", default="build")
     run_parser.add_argument("--manifest")
-    run_parser.add_argument("--port", type=int, default=8787)
+    run_parser.add_argument("--bind-port", type=int, default=8787)
     run_parser.add_argument("--host", default="127.0.0.1")
     run_parser.add_argument("--no-open", action="store_true")
     run_parser.add_argument("--mode", default="mock", choices=["mock", "proxy"])
@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.subcommand == "run":
             options = FlashlessOptions(
                 manifest=args.manifest,
-                port=args.port,
+                port=args.bind_port,
                 host=args.host,
                 open_browser=not args.no_open,
                 mode=args.mode,

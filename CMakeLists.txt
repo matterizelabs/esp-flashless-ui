@@ -1,5 +1,17 @@
 idf_component_register()
 
+# ESP-IDF 5.x does not auto-load idf.py extensions from managed components.
+# To keep `idf.py flashless --no-build` working without manual env setup,
+# bootstrap a project-level idf_ext.py loader when one is not already present.
+set(_flashless_project_ext "${PROJECT_DIR}/idf_ext.py")
+if(NOT EXISTS "${_flashless_project_ext}")
+    configure_file(
+        "${COMPONENT_DIR}/tools/flashless/project_idf_ext.py"
+        "${_flashless_project_ext}"
+        COPYONLY)
+    message(STATUS "flashless: generated ${_flashless_project_ext} for idf.py action auto-load")
+endif()
+
 # Fallback for ESP-IDF versions that do not auto-load idf.py extensions
 # from components. Running `idf.py flashless` still works as a build target.
 if(NOT TARGET flashless)

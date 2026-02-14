@@ -36,11 +36,12 @@ Stop with `Ctrl+C`.
 ## Options
 
 ```bash
-idf.py flashless --manifest flashless.manifest.json --port 8787 --host 127.0.0.1 --strict
+idf.py flashless --manifest flashless.manifest.json --bind-port 8787 --host 127.0.0.1 --strict
 ```
 
 Flags:
 
+- `--bind-port <port>`
 - `--no-open`
 - `--mode mock`
 - `--fixtures <path>`
@@ -77,7 +78,8 @@ Schema file:
 ## Compatibility
 
 - ESP-IDF v6+: command is exposed via component `idf_ext.py` extension.
-- ESP-IDF v5.2+: fallback `flashless` CMake target exists, so `idf.py flashless` still works even where component extension auto-loading is unavailable.
+- ESP-IDF v5.2+: on first `idf.py reconfigure`, flashless auto-generates `${PROJECT_DIR}/idf_ext.py` (only if missing) to auto-load managed component actions, so `idf.py flashless --no-build` and other flags work without manual `IDF_EXTRA_ACTIONS_PATH`.
+- If your project already has a custom `${PROJECT_DIR}/idf_ext.py`, flashless will not overwrite it. In that case, keep your file and load managed component extensions there.
 
 ## Generated report
 
