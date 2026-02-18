@@ -97,15 +97,16 @@ class PreviewServer:
         return self._httpd.server_address
 
     def serve_forever(self) -> None:
+        self._start_watcher()
         try:
             self._httpd.serve_forever(poll_interval=0.2)
         finally:
+            self._stop_watcher()
             self._httpd.server_close()
 
     def start(self) -> None:
         if self._thread is not None:
             return
-        self._start_watcher()
         self._thread = threading.Thread(target=self.serve_forever, daemon=True)
         self._thread.start()
 
