@@ -73,14 +73,21 @@ def discover_manifest(project_dir: Path, override: str | None) -> Path:
     raise FlashlessError(hint)
 
 
-def load_manifest(manifest_path: Path, project_dir: Path, fixtures_override: str | None = None) -> Manifest:
+def load_manifest(
+    manifest_path: Path,
+    project_dir: Path,
+    fixtures_override: str | None = None,
+    allow_absolute_paths: bool = False,
+) -> Manifest:
     if not manifest_path.exists():
         raise FlashlessError(f"Manifest file not found: {manifest_path}")
 
     try:
         raw = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise FlashlessError(f"Manifest is not valid JSON: {manifest_path}: {exc}") from exc
+        raise FlashlessError(
+            f"Manifest is not valid JSON: {manifest_path}: {exc}"
+        ) from exc
 
     if not isinstance(raw, dict):
         raise FlashlessError("Manifest root must be a JSON object.")
@@ -94,7 +101,12 @@ def load_manifest(manifest_path: Path, project_dir: Path, fixtures_override: str
     validation_raw = _as_object(raw, "validation", required=False)
 
     base_path = _normalize_base_path(ui_raw.get("basePath", "/"))
-    asset_root = _resolve_project_path(project_dir, _as_string(ui_raw, "assetRoot"))
+    asset_root = _resolve_project_path(
+        project_dir,
+        _as_string(ui_raw, "assetRoot"),
+        field_name="ui.assetRoot",
+        allow_absolute_paths=allow_absolute_paths,
+    )
     entry_file = _as_string(ui_raw, "entryFile", default="index.html")
     routes = _as_route_list(ui_raw.get("routes", ["/"]))
     spa_fallback = _as_bool(ui_raw.get("spaFallback", True), field="ui.spaFallback")
@@ -106,9 +118,17 @@ def load_manifest(manifest_path: Path, project_dir: Path, fixtures_override: str
         raise FlashlessError("Manifest field 'ui.cachePolicy' must be an object.")
 
     cache_policy = {
-        "maxAgeSeconds": _as_int(cache_policy_raw.get("maxAgeSeconds", 0), "ui.cachePolicy.maxAgeSeconds", minimum=0),
-        "etag": _as_bool(cache_policy_raw.get("etag", True), field="ui.cachePolicy.etag"),
-        "gzip": _as_bool(cache_policy_raw.get("gzip", False), field="ui.cachePolicy.gzip"),
+        "maxAgeSeconds": _as_int(
+            cache_policy_raw.get("maxAgeSeconds", 0),
+            "ui.cachePolicy.maxAgeSeconds",
+            minimum=0,
+        ),
+        "etag": _as_bool(
+            cache_policy_raw.get("etag", True), field="ui.cachePolicy.etag"
+        ),
+        "gzip": _as_bool(
+            cache_policy_raw.get("gzip", False), field="ui.cachePolicy.gzip"
+        ),
     }
 
     mode = "mock"
@@ -117,33 +137,60 @@ def load_manifest(manifest_path: Path, project_dir: Path, fixtures_override: str
     if api_raw:
         mode = _as_string(api_raw, "mode", default="mock").lower()
         if mode not in {"mock", "proxy"}:
-            raise FlashlessError("Manifest field 'api.mode' must be either 'mock' or 'proxy'.")
-        fixtures_dir = _resolve_project_path(project_dir, _as_string(api_raw, "fixturesDir", default="ui-fixtures"))
+            raise FlashlessError(
+                "Manifest field 'api.mode' must be either 'mock' or 'proxy'."
+            )
+        fixtures_dir = _resolve_project_path(
+            project_dir,
+            _as_string(api_raw, "fixturesDir", default="ui-fixtures"),
+            field_name="api.fixturesDir",
+            allow_absolute_paths=allow_absolute_paths,
+        )
         mappings_raw = _as_list(api_raw.get("map", []), "api.map")
 
     if fixtures_override:
-        fixtures_dir = _resolve_project_path(project_dir, fixtures_override)
+        fixtures_dir = _resolve_user_path(project_dir, fixtures_override)
 
     mappings: list[ApiMapping] = []
     for index, mapping_raw in enumerate(mappings_raw):
         if not isinstance(mapping_raw, dict):
-            raise FlashlessError(f"Manifest field 'api.map[{index}]' must be an object.")
+            raise FlashlessError(
+                f"Manifest field 'api.map[{index}]' must be an object."
+            )
         method = _as_string(mapping_raw, "method").upper()
         path = _normalize_route(_as_string(mapping_raw, "path"))
         fixture = _as_string(mapping_raw, "fixture")
-        status = _as_int(mapping_raw.get("status", 200), f"api.map[{index}].status", minimum=100)
+        status = _as_int(
+            mapping_raw.get("status", 200), f"api.map[{index}].status", minimum=100
+        )
         headers_raw = mapping_raw.get("headers", {})
         if not isinstance(headers_raw, dict):
-            raise FlashlessError(f"Manifest field 'api.map[{index}].headers' must be an object.")
+            raise FlashlessError(
+                f"Manifest field 'api.map[{index}].headers' must be an object."
+            )
         headers = {str(k): str(v) for k, v in headers_raw.items()}
-        mappings.append(ApiMapping(method=method, path=path, fixture=fixture, status=status, headers=headers))
+        mappings.append(
+            ApiMapping(
+                method=method,
+                path=path,
+                fixture=fixture,
+                status=status,
+                headers=headers,
+            )
+        )
 
     required_files = (entry_file,)
     disallow_extra_routes = False
     if validation_raw:
-        required_files = tuple(_as_path_list(validation_raw.get("requiredFiles", [entry_file]), "validation.requiredFiles"))
+        required_files = tuple(
+            _as_path_list(
+                validation_raw.get("requiredFiles", [entry_file]),
+                "validation.requiredFiles",
+            )
+        )
         disallow_extra_routes = _as_bool(
-            validation_raw.get("disallowExtraRoutes", False), field="validation.disallowExtraRoutes"
+            validation_raw.get("disallowExtraRoutes", False),
+            field="validation.disallowExtraRoutes",
         )
 
     manifest = Manifest(
@@ -158,7 +205,9 @@ def load_manifest(manifest_path: Path, project_dir: Path, fixtures_override: str
             cache_policy=cache_policy,
         ),
         api=ApiSettings(mode=mode, fixtures_dir=fixtures_dir, mappings=tuple(mappings)),
-        validation=ValidationSettings(required_files=required_files, disallow_extra_routes=disallow_extra_routes),
+        validation=ValidationSettings(
+            required_files=required_files, disallow_extra_routes=disallow_extra_routes
+        ),
     )
     validate_manifest_paths(manifest)
     return manifest
@@ -172,7 +221,9 @@ def validate_manifest_paths(manifest: Manifest) -> None:
         )
 
 
-def _as_object(raw: dict[str, Any], field: str, required: bool = True) -> dict[str, Any]:
+def _as_object(
+    raw: dict[str, Any], field: str, required: bool = True
+) -> dict[str, Any]:
     value = raw.get(field)
     if value is None:
         if required:
@@ -215,7 +266,9 @@ def _as_path_list(value: Any, field: str) -> list[str]:
     result: list[str] = []
     for index, item in enumerate(items):
         if not isinstance(item, str) or not item.strip():
-            raise FlashlessError(f"Manifest field '{field}[{index}]' must be a non-empty string.")
+            raise FlashlessError(
+                f"Manifest field '{field}[{index}]' must be a non-empty string."
+            )
         result.append(item)
     return result
 
@@ -225,7 +278,9 @@ def _as_route_list(value: Any) -> list[str]:
     normalized: list[str] = []
     for index, route in enumerate(routes):
         if not isinstance(route, str) or not route.strip():
-            raise FlashlessError(f"Manifest field 'ui.routes[{index}]' must be a non-empty string.")
+            raise FlashlessError(
+                f"Manifest field 'ui.routes[{index}]' must be a non-empty string."
+            )
         normalized.append(_normalize_route(route))
     return normalized
 
@@ -250,7 +305,22 @@ def _normalize_route(route: str) -> str:
     return cleaned
 
 
-def _resolve_project_path(project_dir: Path, path_value: str) -> Path:
+def _resolve_project_path(
+    project_dir: Path, path_value: str, field_name: str, allow_absolute_paths: bool
+) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        if not allow_absolute_paths:
+            raise FlashlessError(
+                f"Manifest field '{field_name}' must be a project-relative path by default. "
+                f"Received absolute path: {path}. "
+                "Use '--allow-absolute-paths' to opt in when you trust this manifest."
+            )
+        return path.resolve()
+    return (project_dir / path).resolve()
+
+
+def _resolve_user_path(project_dir: Path, path_value: str) -> Path:
     path = Path(path_value)
     if not path.is_absolute():
         path = project_dir / path

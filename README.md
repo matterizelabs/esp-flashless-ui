@@ -46,7 +46,8 @@ Default behavior:
 2. Loads `flashless.manifest.json` (or `web/flashless.manifest.json`).
 3. If no manifest exists, tries auto-manifest generation.
 4. Starts preview server on `http://127.0.0.1:8787/`.
-5. Opens browser automatically.
+5. Enables live reload for HTML pages when assets/fixtures change.
+6. Opens browser automatically.
 
 Stop with `Ctrl+C`.
 
@@ -156,8 +157,12 @@ Common options:
 - `--no-build`
 - `--strict`
 - `--no-auto`
+- `--allow-absolute-paths`
+- `--no-live-reload`
 
 ## Notes
 
 - Auto-manifest works best when frontend assets are discoverable from embedded files and include an `index.html` entry.
 - If auto mode cannot infer your UI, pass an explicit manifest with `--manifest`.
+- For safety, manifest `ui.assetRoot` and `api.fixturesDir` must be project-relative by default; use `--allow-absolute-paths` only when you trust the manifest and intentionally need absolute roots.
+- Live reload is enabled by default. Use `--no-live-reload` to disable browser auto-refresh.

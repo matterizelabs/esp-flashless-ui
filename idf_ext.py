@@ -12,8 +12,10 @@ except Exception:  # pragma: no cover - click is available in ESP-IDF env
 try:
     from idf_py_actions.errors import FatalError
 except Exception:  # pragma: no cover - fallback for local tests
+
     class FatalError(RuntimeError):
         """Compatibility wrapper when idf_py_actions is unavailable."""
+
 
 _COMPONENT_DIR = Path(__file__).resolve().parent
 _TOOLS_DIR = _COMPONENT_DIR / "tools"
@@ -60,6 +62,8 @@ def action_extensions(base_actions, project_path):
             run_build=not kwargs.get("no_build", False),
             strict=kwargs.get("strict", False),
             auto=not kwargs.get("no_auto", False),
+            allow_absolute_paths=kwargs.get("allow_absolute_paths", False),
+            live_reload=not kwargs.get("no_live_reload", False),
         )
         try:
             return run_flashless(project_path, build_dir, options)
@@ -128,6 +132,18 @@ def action_extensions(base_actions, project_path):
                     {
                         "names": ["--no-auto"],
                         "help": "Disable automatic manifest/fixture bootstrap when no manifest is present.",
+                        "is_flag": True,
+                        "default": False,
+                    },
+                    {
+                        "names": ["--allow-absolute-paths"],
+                        "help": "Allow absolute paths in manifest ui.assetRoot/api.fixturesDir.",
+                        "is_flag": True,
+                        "default": False,
+                    },
+                    {
+                        "names": ["--no-live-reload"],
+                        "help": "Disable automatic browser reload when files change.",
                         "is_flag": True,
                         "default": False,
                     },
