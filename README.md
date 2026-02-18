@@ -51,6 +51,10 @@ Default behavior:
 
 Stop with `Ctrl+C`.
 
+## Demo
+
+![idf.py flashless demo](docs/demo/esp-idf-frontend-without-flashing.gif)
+
 ## Example Manifest + Run + Report
 
 `flashless.manifest.json`
