@@ -1,4 +1,4 @@
-version: "1.0.3"
+version: "1.0.5"
 description: "ESP-IDF flashless: no-flash browser preview for frontend routes and assets"
 url: "https://github.com/matterizelabs/esp-flashless-ui"
 documentation: "https://github.com/matterizelabs/esp-flashless-ui#readme"
@@ -21,6 +21,7 @@ files:
     - "schema/*.json"
     - "examples/*.json"
     - "tools/flashless/*.py"
+    - "docs/demo/*.gif"
   exclude:
     - "**/__pycache__/**"
     - "tests/**"

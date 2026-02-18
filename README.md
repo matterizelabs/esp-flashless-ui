@@ -23,14 +23,14 @@ It keeps parity checks via a manifest and optional strict validation.
 From registry:
 
 ```bash
-idf.py add-dependency "matterizelabs/flashless^1.0.3"
+idf.py add-dependency "matterizelabs/flashless^1.0.5"
 idf.py reconfigure
 ```
 
 From Git:
 
 ```bash
-idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.3 flashless
+idf.py add-dependency --git https://github.com/matterizelabs/esp-flashless-ui.git --git-ref v1.0.5 flashless
 idf.py reconfigure
 ```
 
