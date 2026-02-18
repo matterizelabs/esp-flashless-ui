@@ -17,6 +17,8 @@ from urllib.parse import unquote, urlparse
 from .errors import FlashlessError
 from .manifest import Manifest, route_matches
 
+_STREAM_CHUNK_SIZE = 64 * 1024
+
 
 @dataclass(frozen=True)
 class ValidationResult:
@@ -26,7 +28,11 @@ class ValidationResult:
 
     @property
     def has_errors(self) -> bool:
-        return bool(self.missing_required_files or self.missing_fixture_files or self.unresolved_routes)
+        return bool(
+            self.missing_required_files
+            or self.missing_fixture_files
+            or self.unresolved_routes
+        )
 
 
 def validate_parity(manifest: Manifest) -> ValidationResult:
@@ -48,7 +54,10 @@ def validate_parity(manifest: Manifest) -> ValidationResult:
         candidate = _route_to_asset_candidate(route)
         if candidate and _safe_join(manifest.ui.asset_root, candidate).exists():
             continue
-        if manifest.ui.spa_fallback and _safe_join(manifest.ui.asset_root, manifest.ui.entry_file).exists():
+        if (
+            manifest.ui.spa_fallback
+            and _safe_join(manifest.ui.asset_root, manifest.ui.entry_file).exists()
+        ):
             continue
         unresolved_routes.append(route)
 
@@ -60,7 +69,13 @@ def validate_parity(manifest: Manifest) -> ValidationResult:
 
 
 class PreviewServer:
-    def __init__(self, manifest: Manifest, host: str, port: int, request_log_level: str = "errors"):
+    def __init__(
+        self,
+        manifest: Manifest,
+        host: str,
+        port: int,
+        request_log_level: str = "errors",
+    ):
         self._manifest = manifest
         self._host = host
         self._port = port
@@ -117,7 +132,7 @@ class PreviewServer:
             def do_PATCH(self):
                 self._dispatch("PATCH")
 
-            def log_message(self, fmt: str, *args: Any) -> None:
+            def log_message(self, format: str, *args: Any) -> None:
                 status_code: int | None = None
                 if len(args) >= 2:
                     try:
@@ -127,7 +142,7 @@ class PreviewServer:
 
                 if not _should_log_request(request_log_level, status_code):
                     return
-                print(f"[flashless] {self.address_string()} - {fmt % args}")
+                print(f"[flashless] {self.address_string()} - {format % args}")
 
             def _dispatch(self, method: str) -> None:
                 parsed = urlparse(self.path)
@@ -135,19 +150,34 @@ class PreviewServer:
 
                 mapped = api_map.get((method.upper(), request_path))
                 if mapped is not None:
-                    return self._serve_fixture(mapped.fixture, mapped.status, mapped.headers)
+                    return self._serve_fixture(
+                        mapped.fixture, mapped.status, mapped.headers
+                    )
 
-                if base_path != "/" and not request_path.startswith(base_path + "/") and request_path != base_path:
+                if (
+                    base_path != "/"
+                    and not request_path.startswith(base_path + "/")
+                    and request_path != base_path
+                ):
                     return self._respond_not_found(request_path)
 
                 rel_route = _relative_to_base(request_path, base_path)
 
                 static_candidate = self._resolve_static_candidate(rel_route)
-                if static_candidate is not None and static_candidate.exists() and static_candidate.is_file():
+                if (
+                    static_candidate is not None
+                    and static_candidate.exists()
+                    and static_candidate.is_file()
+                ):
                     return self._serve_file(static_candidate)
 
-                is_declared = any(route_matches(pattern, rel_route) for pattern in manifest.ui.routes)
-                if is_declared or (manifest.ui.spa_fallback and not manifest.validation.disallow_extra_routes):
+                is_declared = any(
+                    route_matches(pattern, rel_route) for pattern in manifest.ui.routes
+                )
+                if is_declared or (
+                    manifest.ui.spa_fallback
+                    and not manifest.validation.disallow_extra_routes
+                ):
                     entry = _safe_join(manifest.ui.asset_root, manifest.ui.entry_file)
                     if entry.exists() and entry.is_file():
                         return self._serve_file(entry)
@@ -164,44 +194,70 @@ class PreviewServer:
                     return candidate
 
                 if not os.path.splitext(normalized)[1]:
-                    html_candidate = _safe_join(manifest.ui.asset_root, normalized + ".html")
+                    html_candidate = _safe_join(
+                        manifest.ui.asset_root, normalized + ".html"
+                    )
                     if html_candidate.exists() and html_candidate.is_file():
                         return html_candidate
                 return None
 
-            def _serve_fixture(self, fixture_rel: str, status: int, headers: dict[str, str]) -> None:
+            def _serve_fixture(
+                self, fixture_rel: str, status: int, headers: dict[str, str]
+            ) -> None:
                 fixture_path = _safe_join(manifest.api.fixtures_dir, fixture_rel)
                 if not fixture_path.exists() or not fixture_path.is_file():
-                    return self._respond_json({"error": f"Missing fixture: {fixture_rel}"}, HTTPStatus.INTERNAL_SERVER_ERROR)
+                    return self._respond_json(
+                        {"error": f"Missing fixture: {fixture_rel}"},
+                        HTTPStatus.INTERNAL_SERVER_ERROR,
+                    )
 
-                payload = fixture_path.read_bytes()
+                size = fixture_path.stat().st_size
                 self.send_response(status)
-                content_type = headers.get("Content-Type") or _guess_content_type(fixture_path)
+                content_type = headers.get("Content-Type") or _guess_content_type(
+                    fixture_path
+                )
                 self.send_header("Content-Type", content_type)
-                self.send_header("Content-Length", str(len(payload)))
+                self.send_header("Content-Length", str(size))
                 for name, value in headers.items():
                     if name.lower() in {"content-length", "content-type"}:
                         continue
                     self.send_header(name, value)
                 self.end_headers()
-                self.wfile.write(payload)
+                self._stream_file(fixture_path)
 
             def _serve_file(self, file_path: Path) -> None:
-                data = file_path.read_bytes()
+                size = file_path.stat().st_size
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", _guess_content_type(file_path))
-                self.send_header("Content-Length", str(len(data)))
-                self.send_header("Cache-Control", f"public, max-age={manifest.ui.cache_policy['maxAgeSeconds']}")
+                self.send_header("Content-Length", str(size))
+                self.send_header(
+                    "Cache-Control",
+                    f"public, max-age={manifest.ui.cache_policy['maxAgeSeconds']}",
+                )
                 if manifest.ui.cache_policy.get("etag", True):
                     stat = file_path.stat()
-                    self.send_header("ETag", f'W/"{stat.st_mtime_ns:x}-{stat.st_size:x}"')
+                    self.send_header(
+                        "ETag", f'W/"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+                    )
                 self.end_headers()
-                self.wfile.write(data)
+                self._stream_file(file_path)
+
+            def _stream_file(self, file_path: Path) -> None:
+                with file_path.open("rb") as handle:
+                    while True:
+                        chunk = handle.read(_STREAM_CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
 
             def _respond_not_found(self, path: str) -> None:
-                self._respond_json({"error": "Not found", "path": path}, HTTPStatus.NOT_FOUND)
+                self._respond_json(
+                    {"error": "Not found", "path": path}, HTTPStatus.NOT_FOUND
+                )
 
-            def _respond_json(self, payload: dict[str, Any], status: HTTPStatus) -> None:
+            def _respond_json(
+                self, payload: dict[str, Any], status: HTTPStatus
+            ) -> None:
                 body = json.dumps(payload).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")

@@ -66,8 +66,38 @@ class AutoGenTests(unittest.TestCase):
 
             manifest_json = json.loads(result.manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest_json["ui"]["assetRoot"], "components/web/assets")
+            self.assertEqual(
+                manifest_json["api"]["fixturesDir"], "build/flashless/auto/fixtures"
+            )
             self.assertEqual(manifest_json["ui"]["routes"], ["/"])
             self.assertEqual(manifest_json["api"]["map"][0]["path"], "/api/status")
+
+    def test_generate_auto_manifest_ignores_heavy_directories(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+
+            ignored_node = project / "node_modules" / "pkg"
+            ignored_node.mkdir(parents=True)
+            (ignored_node / "index.html").write_text(
+                "<html>ignored</html>", encoding="utf-8"
+            )
+
+            ignored_venv = project / ".venv" / "web"
+            ignored_venv.mkdir(parents=True)
+            (ignored_venv / "index.html").write_text(
+                "<html>ignored</html>", encoding="utf-8"
+            )
+
+            assets = project / "main" / "web"
+            assets.mkdir(parents=True)
+            (assets / "index.html").write_text("<html>ok</html>", encoding="utf-8")
+            (assets / "app.js").write_text("console.log('ok')", encoding="utf-8")
+
+            auto_dir = project / "build" / "flashless" / "auto"
+            result = generate_auto_manifest(project, auto_dir)
+
+            manifest_json = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest_json["ui"]["assetRoot"], "main/web")
 
 
 if __name__ == "__main__":

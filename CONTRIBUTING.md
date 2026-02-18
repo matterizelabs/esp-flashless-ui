@@ -7,6 +7,7 @@ Thanks for contributing to `flashless`.
 - Search existing issues/PRs before opening a new one.
 - Keep changes focused and small.
 - For behavior changes, include tests or explain why tests are not needed.
+- Prefer project-relative manifest paths; absolute roots require explicit `--allow-absolute-paths` opt-in.
 
 ## Development Setup
 
@@ -38,4 +39,3 @@ When filing a bug, include:
 - Command used (`idf.py flashless ...`)
 - Expected behavior
 - Actual behavior and logs
-

@@ -156,8 +156,10 @@ Common options:
 - `--no-build`
 - `--strict`
 - `--no-auto`
+- `--allow-absolute-paths`
 
 ## Notes
 
 - Auto-manifest works best when frontend assets are discoverable from embedded files and include an `index.html` entry.
 - If auto mode cannot infer your UI, pass an explicit manifest with `--manifest`.
+- For safety, manifest `ui.assetRoot` and `api.fixturesDir` must be project-relative by default; use `--allow-absolute-paths` only when you trust the manifest and intentionally need absolute roots.

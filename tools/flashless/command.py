@@ -26,9 +26,12 @@ class FlashlessOptions:
     run_build: bool = True
     strict: bool = False
     auto: bool = True
+    allow_absolute_paths: bool = False
 
 
-def run_flashless(project_path: str | Path, build_dir: str | Path, options: FlashlessOptions) -> int:
+def run_flashless(
+    project_path: str | Path, build_dir: str | Path, options: FlashlessOptions
+) -> int:
     project_dir = Path(project_path).resolve()
     build_dir_path = Path(build_dir)
     if not build_dir_path.is_absolute():
@@ -42,10 +45,20 @@ def run_flashless(project_path: str | Path, build_dir: str | Path, options: Flas
 
     manifest_path = _resolve_manifest_path(project_dir, build_dir_path, options)
     fixtures_override = options.fixtures
-    if options.auto and options.manifest is None and fixtures_override is None and _is_auto_manifest(manifest_path):
+    if (
+        options.auto
+        and options.manifest is None
+        and fixtures_override is None
+        and _is_auto_manifest(manifest_path)
+    ):
         fixtures_override = str(manifest_path.parent / "fixtures")
 
-    manifest = load_manifest(manifest_path, project_dir, fixtures_override=fixtures_override)
+    manifest = load_manifest(
+        manifest_path,
+        project_dir,
+        fixtures_override=fixtures_override,
+        allow_absolute_paths=options.allow_absolute_paths,
+    )
 
     validation = validate_parity(manifest)
     if validation.has_errors and options.strict:
@@ -64,7 +77,9 @@ def run_flashless(project_path: str | Path, build_dir: str | Path, options: Flas
             request_log_level=options.request_log,
         )
     except OSError as exc:
-        raise FlashlessError(f"Failed to bind preview server on {options.host}:{options.port}: {exc}") from exc
+        raise FlashlessError(
+            f"Failed to bind preview server on {options.host}:{options.port}: {exc}"
+        ) from exc
 
     host, port = server.address
     report_path = write_report(
@@ -82,11 +97,17 @@ def run_flashless(project_path: str | Path, build_dir: str | Path, options: Flas
     if validation.has_errors:
         print("[flashless] Validation warnings detected. Use --strict to fail fast.")
         if validation.missing_required_files:
-            print(f"[flashless]   missing required files: {', '.join(validation.missing_required_files)}")
+            print(
+                f"[flashless]   missing required files: {', '.join(validation.missing_required_files)}"
+            )
         if validation.missing_fixture_files:
-            print(f"[flashless]   missing fixtures: {', '.join(validation.missing_fixture_files)}")
+            print(
+                f"[flashless]   missing fixtures: {', '.join(validation.missing_fixture_files)}"
+            )
         if validation.unresolved_routes:
-            print(f"[flashless]   unresolved routes: {', '.join(validation.unresolved_routes)}")
+            print(
+                f"[flashless]   unresolved routes: {', '.join(validation.unresolved_routes)}"
+            )
 
     if options.open_browser:
         webbrowser.open(url)
@@ -115,7 +136,9 @@ def _run_idf_build(project_dir: Path, build_dir: Path) -> None:
     try:
         subprocess.run(command, check=True)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        raise FlashlessError("Preflight build failed. Resolve build errors or use --no-build.") from exc
+        raise FlashlessError(
+            "Preflight build failed. Resolve build errors or use --no-build."
+        ) from exc
 
 
 def _to_url(host: str, port: int, base_path: str) -> str:
@@ -126,7 +149,9 @@ def _to_url(host: str, port: int, base_path: str) -> str:
     return f"http://{printable_host}:{port}{base}"
 
 
-def _resolve_manifest_path(project_dir: Path, build_dir: Path, options: FlashlessOptions) -> Path:
+def _resolve_manifest_path(
+    project_dir: Path, build_dir: Path, options: FlashlessOptions
+) -> Path:
     if options.manifest is not None:
         return discover_manifest(project_dir, options.manifest)
 
