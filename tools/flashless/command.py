@@ -27,6 +27,7 @@ class FlashlessOptions:
     strict: bool = False
     auto: bool = True
     allow_absolute_paths: bool = False
+    live_reload: bool = True
 
 
 def run_flashless(
@@ -75,6 +76,7 @@ def run_flashless(
             host=options.host,
             port=options.port,
             request_log_level=options.request_log,
+            live_reload=options.live_reload,
         )
     except OSError as exc:
         raise FlashlessError(

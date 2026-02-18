@@ -63,6 +63,7 @@ def action_extensions(base_actions, project_path):
             strict=kwargs.get("strict", False),
             auto=not kwargs.get("no_auto", False),
             allow_absolute_paths=kwargs.get("allow_absolute_paths", False),
+            live_reload=not kwargs.get("no_live_reload", False),
         )
         try:
             return run_flashless(project_path, build_dir, options)
@@ -137,6 +138,12 @@ def action_extensions(base_actions, project_path):
                     {
                         "names": ["--allow-absolute-paths"],
                         "help": "Allow absolute paths in manifest ui.assetRoot/api.fixturesDir.",
+                        "is_flag": True,
+                        "default": False,
+                    },
+                    {
+                        "names": ["--no-live-reload"],
+                        "help": "Disable automatic browser reload when files change.",
                         "is_flag": True,
                         "default": False,
                     },

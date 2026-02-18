@@ -37,6 +37,26 @@ class IdfExtTests(unittest.TestCase):
         _, _, options = patched_run.call_args.args
         self.assertTrue(options.allow_absolute_paths)
 
+    def test_action_includes_no_live_reload_option(self):
+        actions = idf_ext.action_extensions({}, "/tmp")
+        option_names = [
+            name
+            for option in actions["actions"]["flashless"]["options"]
+            for name in option["names"]
+        ]
+        self.assertIn("--no-live-reload", option_names)
+
+    def test_callback_disables_live_reload_with_flag(self):
+        with mock.patch("idf_ext.run_flashless", return_value=0) as patched_run:
+            actions = idf_ext.action_extensions({}, "/tmp/project")
+            callback = actions["actions"]["flashless"]["callback"]
+            args = SimpleNamespace(build_dir="build")
+            result = callback(None, None, args, no_live_reload=True)
+
+        self.assertEqual(result, 0)
+        _, _, options = patched_run.call_args.args
+        self.assertFalse(options.live_reload)
+
 
 if __name__ == "__main__":
     unittest.main()

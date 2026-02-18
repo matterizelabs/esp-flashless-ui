@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -31,6 +32,8 @@ _IGNORED_DIRS = {
     "venv",
     "dist",
 }
+_MAX_SCAN_FILES = 20000
+_MAX_SCAN_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -118,6 +121,35 @@ def generate_auto_manifest(project_dir: Path, auto_dir: Path) -> AutoBootstrapRe
 class _Route:
     method: str
     path: str
+
+
+@dataclass
+class _ScanBudget:
+    max_files: int
+    deadline: float
+    files_seen: int = 0
+
+    @classmethod
+    def create(cls) -> "_ScanBudget":
+        return cls(
+            max_files=_MAX_SCAN_FILES,
+            deadline=time.monotonic() + _MAX_SCAN_SECONDS,
+        )
+
+    def check(self) -> None:
+        if time.monotonic() > self.deadline:
+            raise FlashlessError(
+                "Auto-discovery scan timed out. "
+                "Add a manifest with '--manifest' or disable auto mode with '--no-auto'."
+            )
+
+    def consume_file(self) -> None:
+        self.files_seen += 1
+        if self.files_seen > self.max_files:
+            raise FlashlessError(
+                "Auto-discovery scanned too many files. "
+                "Add a manifest with '--manifest' or disable auto mode with '--no-auto'."
+            )
 
 
 def _discover_asset_root(project_dir: Path) -> Path | None:
@@ -271,12 +303,21 @@ def _normalize_route(route: str) -> str:
 
 
 def _iter_project_files(project_dir: Path) -> Iterable[Path]:
-    for path in project_dir.rglob("*"):
-        if path.is_dir():
-            continue
-        if _is_ignored(path.relative_to(project_dir)):
-            continue
-        yield path
+    budget = _ScanBudget.create()
+    for root, dirs, files in os.walk(project_dir, topdown=True, followlinks=False):
+        budget.check()
+        root_path = Path(root)
+        rel_root = root_path.relative_to(project_dir)
+        dirs[:] = [dirname for dirname in dirs if not _is_ignored(rel_root / dirname)]
+
+        for filename in files:
+            budget.check()
+            file_path = root_path / filename
+            rel_path = file_path.relative_to(project_dir)
+            if _is_ignored(rel_path):
+                continue
+            budget.consume_file()
+            yield file_path
 
 
 def _is_ignored(rel_path: Path) -> bool:

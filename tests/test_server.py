@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from urllib.error import HTTPError
@@ -204,6 +205,94 @@ class ServerTests(unittest.TestCase):
             finally:
                 server.stop()
 
+    def test_server_injects_live_reload_script_by_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            asset_root = project / "web" / "dist"
+            asset_root.mkdir(parents=True)
+            (asset_root / "index.html").write_text(
+                "<html><body>index</body></html>", encoding="utf-8"
+            )
+
+            manifest_path = project / "flashless.manifest.json"
+            manifest_path.write_text(
+                json.dumps({"version": "1", "ui": {"assetRoot": "web/dist"}}),
+                encoding="utf-8",
+            )
+
+            manifest = load_manifest(manifest_path, project)
+            server = PreviewServer(manifest, "127.0.0.1", 0)
+            host, port = server.address
+            server.start()
+            try:
+                body = _read_text(f"http://{host}:{port}/")
+                self.assertIn("EventSource", body)
+                self.assertIn("/__flashless/reload", body)
+            finally:
+                server.stop()
+
+    def test_server_disables_live_reload_script_when_configured(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            asset_root = project / "web" / "dist"
+            asset_root.mkdir(parents=True)
+            (asset_root / "index.html").write_text(
+                "<html><body>index</body></html>", encoding="utf-8"
+            )
+
+            manifest_path = project / "flashless.manifest.json"
+            manifest_path.write_text(
+                json.dumps({"version": "1", "ui": {"assetRoot": "web/dist"}}),
+                encoding="utf-8",
+            )
+
+            manifest = load_manifest(manifest_path, project)
+            server = PreviewServer(manifest, "127.0.0.1", 0, live_reload=False)
+            host, port = server.address
+            server.start()
+            try:
+                body = _read_text(f"http://{host}:{port}/")
+                self.assertNotIn("EventSource", body)
+                self.assertNotIn("/__flashless/reload", body)
+            finally:
+                server.stop()
+
+    def test_live_reload_endpoint_reports_version_bumps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            asset_root = project / "web" / "dist"
+            asset_root.mkdir(parents=True)
+            index_path = asset_root / "index.html"
+            index_path.write_text("<html><body>index</body></html>", encoding="utf-8")
+
+            manifest_path = project / "flashless.manifest.json"
+            manifest_path.write_text(
+                json.dumps({"version": "1", "ui": {"assetRoot": "web/dist"}}),
+                encoding="utf-8",
+            )
+
+            manifest = load_manifest(manifest_path, project)
+            server = PreviewServer(
+                manifest,
+                "127.0.0.1",
+                0,
+                live_reload=True,
+                live_reload_interval=0.05,
+            )
+            host, port = server.address
+            server.start()
+            try:
+                url = f"http://{host}:{port}/__flashless/reload"
+                version = _read_sse_version(url)
+                index_path.write_text(
+                    "<html><body>updated</body></html>",
+                    encoding="utf-8",
+                )
+                bumped = _wait_for_sse_version(url, version, timeout=2.0)
+                self.assertGreater(bumped, version)
+            finally:
+                server.stop()
+
 
 def _read_text(url: str) -> str:
     request = Request(url, method="GET")
@@ -215,6 +304,29 @@ def _read_bytes_with_headers(url: str) -> tuple[bytes, dict[str, str]]:
     request = Request(url, method="GET")
     with urlopen(request, timeout=5) as response:  # noqa: S310 - local test URL only
         return response.read(), dict(response.headers.items())
+
+
+def _read_sse_version(url: str) -> int:
+    request = Request(url, method="GET")
+    with urlopen(request, timeout=5) as response:  # noqa: S310 - local test URL only
+        headers = dict(response.headers.items())
+        assert "text/event-stream" in headers.get("Content-Type", "")
+        while True:
+            line = response.readline().decode("utf-8")
+            if not line:
+                raise AssertionError("Expected SSE data event")
+            if line.startswith("data:"):
+                return int(line.split(":", 1)[1].strip())
+
+
+def _wait_for_sse_version(url: str, after: int, timeout: float) -> int:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        value = _read_sse_version(url)
+        if value > after:
+            return value
+        time.sleep(0.05)
+    raise AssertionError("Live reload version did not increase")
 
 
 if __name__ == "__main__":

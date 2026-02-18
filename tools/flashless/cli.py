@@ -66,6 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--strict", action="store_true")
     run_parser.add_argument("--no-auto", action="store_true")
     run_parser.add_argument("--allow-absolute-paths", action="store_true")
+    run_parser.add_argument("--no-live-reload", action="store_true")
 
     init_parser = subparsers.add_parser(
         "init-manifest", help="write a manifest template"
@@ -94,6 +95,7 @@ def main(argv: list[str] | None = None) -> int:
                 strict=args.strict,
                 auto=not args.no_auto,
                 allow_absolute_paths=args.allow_absolute_paths,
+                live_reload=not args.no_live_reload,
             )
             return run_flashless(args.project_dir, args.build_dir, options)
 
